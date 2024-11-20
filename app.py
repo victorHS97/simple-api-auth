@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from database import db
 from models.user import User
-from flask_login import LoginManager, login_user, current_user
+from flask_login import LoginManager, login_user, current_user, login_required, logout_user
 
 # LIBS
 login_manager = LoginManager()
@@ -34,6 +34,28 @@ def login():
         return jsonify({"Message": "Autenticação feita com sucesso"})
 
     return jsonify({"Message": "Credenciais invalidas"}), 400
+
+
+@app.route('/logout', methods=['GET'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"Message": "Logout realizado com sucesso"})
+
+
+@app.route('/user', methods=['POST'])
+@login_required
+def create_user():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if username and password:
+        user = User(username=username, password=password)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({"Message": "Cadastro realizado com sucesso"})
+    return jsonify({"message": "Dados invalidos"})
 
 
 @app.route('/hello-world', methods=['GET'])
