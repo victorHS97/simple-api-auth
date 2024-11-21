@@ -44,7 +44,6 @@ def logout():
 
 
 @app.route('/user', methods=['POST'])
-@login_required
 def create_user():
     data = request.json
     username = data.get('username')
@@ -56,6 +55,40 @@ def create_user():
         db.session.commit()
         return jsonify({"Message": "Cadastro realizado com sucesso"})
     return jsonify({"message": "Dados invalidos"})
+
+
+@app.route('/user/<int:id_user>', methods=['GET'])
+@login_required
+def read_user(id_user):
+    user = User.query.get(id_user)
+    if user:
+        return jsonify({"message": f'Usuario encontrado: {user.username}'})
+    return jsonify({"message": "usuario não econtrado"})
+
+
+@app.route('/user/<int:id_user>', methods=['PUT'])
+@login_required
+def update_user(id_user):
+    user = User.query.get(id_user)
+    data = request.json
+    if user:
+        user.password = data.get('password')
+        db.session.commit()
+        return jsonify({"message": f" usuario {user.username} atualizado com sucesso"})
+    return jsonify({"message": "Usuario não econtrado"})
+
+
+@app.route('/user/<int:id_user>', methods=['DELETE'])
+@login_required
+def delete_user(id_user):
+    if id_user == current_user.id:
+        return jsonify({"message": "Deletação não permitida"})
+    user = User.query.get(id_user)
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"message": f'usuario {user.username} foi excluido com sucesso'})
+    return jsonify({"message": "usuario não encontrado"})
 
 
 @app.route('/hello-world', methods=['GET'])
