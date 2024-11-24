@@ -2,14 +2,14 @@ from flask import Flask, request, jsonify
 from database import db
 from models.user import User
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
-
+import bcrypt
 # LIBS
 login_manager = LoginManager()
 app = Flask(__name__)
 
 # CONFIG FLASK
 app.config['SECRET_KEY'] = "your secret key"
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud'
 
 db.init_app(app)
 login_manager.init_app(app)
@@ -29,7 +29,7 @@ def login():
     password = data.get('password')
     # abaixo é feita uma busca no banco o usuario pelo username
     user = User.query.filter_by(username=username).first()
-    if user and password == user.password:
+    if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
         login_user(user)
         return jsonify({"Message": "Autenticação feita com sucesso"})
 
@@ -50,7 +50,8 @@ def create_user():
     password = data.get('password')
 
     if username and password:
-        user = User(username=username, password=password)
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        user = User(username=username, password=hashed_password, role='user')
         db.session.add(user)
         db.session.commit()
         return jsonify({"Message": "Cadastro realizado com sucesso"})
@@ -63,7 +64,7 @@ def read_user(id_user):
     user = User.query.get(id_user)
     if user:
         return jsonify({"message": f'Usuario encontrado: {user.username}'})
-    return jsonify({"message": "usuario não econtrado"})
+    return jsonify({"message": "usuario não econtrado"}), 404
 
 
 @app.route('/user/<int:id_user>', methods=['PUT'])
@@ -72,23 +73,29 @@ def update_user(id_user):
     user = User.query.get(id_user)
     data = request.json
     if user:
-        user.password = data.get('password')
+        if id_user != current_user.id and current_user.role == 'user':
+            return jsonify({"message": "Operação nao permitida"}), 403
+        hashed_password = bcrypt.hashpw(str.encode(
+            data.get('password')), bcrypt.gensalt())
+        user.password = hashed_password
         db.session.commit()
         return jsonify({"message": f" usuario {user.username} atualizado com sucesso"})
-    return jsonify({"message": "Usuario não econtrado"})
+    return jsonify({"message": "Usuario não econtrado"}), 404
 
 
 @app.route('/user/<int:id_user>', methods=['DELETE'])
 @login_required
 def delete_user(id_user):
-    if id_user == current_user.id:
-        return jsonify({"message": "Deletação não permitida"})
+    if current_user.role == 'user':
+        return jsonify({"message": "Operação nao permitida"}), 403
+    elif id_user == current_user.id:
+        return jsonify({"message": "Operação não permitida"})
     user = User.query.get(id_user)
     if user:
         db.session.delete(user)
         db.session.commit()
         return jsonify({"message": f'usuario {user.username} foi excluido com sucesso'})
-    return jsonify({"message": "usuario não encontrado"})
+    return jsonify({"message": "usuario não encontrado"}), 404
 
 
 @app.route('/hello-world', methods=['GET'])
